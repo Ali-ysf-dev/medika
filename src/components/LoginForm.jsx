@@ -3,19 +3,55 @@ import { gsap } from 'gsap'
 
 function LoginForm({setIsLoggedIn}) {
   const formRef = useRef(null)
+  const welcomeRef = useRef(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showWelcome, setShowWelcome] = useState(true)
+  const [showForm, setShowForm] = useState(false)
 
   useEffect(() => {
-    if (formRef.current) {
-      gsap.fromTo(formRef.current, 
-        { opacity: 0, scale: 0.9 },
-        { opacity: 1, scale: 1, duration: 0.5, ease: "power2.out" }
+    // Animate welcome message in
+    if (welcomeRef.current && showWelcome) {
+      gsap.fromTo(welcomeRef.current,
+        { opacity: 0, scale: 0.8, color: '#ffffff' },
+        { 
+          opacity: 1, 
+          scale: 1, 
+          color: '#2563eb',
+          duration: 1, 
+          ease: "power2.out",
+          delay: 0.5,
+          onComplete: () => {
+            // After 1 second, fade out welcome and show form
+            setTimeout(() => {
+              gsap.to(welcomeRef.current, {
+                opacity: 0,
+                scale: 0.8,
+                duration: 0.5,
+                ease: "power2.in",
+                onComplete: () => {
+                  setShowWelcome(false)
+                  setShowForm(true)
+                }
+              })
+            }, 1000)
+          }
+        }
       )
     }
-  }, [])
+  }, [showWelcome])
+
+  useEffect(() => {
+    // Animate form in
+    if (formRef.current && showForm) {
+      gsap.fromTo(formRef.current, 
+        { opacity: 0, scale: 0.9, y: 20 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.6, ease: "power2.out" }
+      )
+    }
+  }, [showForm])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -77,11 +113,23 @@ function LoginForm({setIsLoggedIn}) {
 
   return (
     <div className="flex items-center justify-center h-full w-full p-8">
-      <form 
-        ref={formRef}
-        onSubmit={handleSubmit}
-        className="bg-white/95 backdrop-blur-sm rounded-[40px] p-8 w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.3),0_10px_30px_rgba(0,0,0,0.2),0_5px_15px_rgba(0,0,0,0.15),inset_0_2px_4px_rgba(255,255,255,0.5)] border border-white/20"
-      >
+      {showWelcome && (
+        <div 
+          ref={welcomeRef}
+          className="text-center"
+        >
+          <h1 className="text-6xl font-bold text-white">
+            Welcome to Medika
+          </h1>
+        </div>
+      )}
+      
+      {showForm && (
+        <form 
+          ref={formRef}
+          onSubmit={handleSubmit}
+          className="bg-white/95 backdrop-blur-sm rounded-[40px] p-8 w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.3),0_10px_30px_rgba(0,0,0,0.2),0_5px_15px_rgba(0,0,0,0.15),inset_0_2px_4px_rgba(255,255,255,0.5)] border border-white/20"
+        >
         <h2 className="text-3xl font-bold text-gray-800 mb-2 text-center">
           {isSignUp ? 'Create Account' : 'Welcome Back'}
         </h2>
@@ -165,7 +213,8 @@ function LoginForm({setIsLoggedIn}) {
             {isSignUp ? 'Sign in' : 'Sign up'}
           </button>
         </p>
-      </form>
+        </form>
+      )}
     </div>
   )
 }
