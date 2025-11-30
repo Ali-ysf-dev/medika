@@ -1,21 +1,67 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import patientDataStore from '../store/patientDataStore'
 import '../App.css'
 
-function AppointmentDetailModal({ appointment, onClose, onUpdate }) {
-  // TODO: Fetch from database based on appointment.patient
-  const [patientDetails] = useState({
+function AppointmentDetailModal({ appointment, onClose, onUpdate, onUpdatePatient }) {
+  // Find patient by name (in real app, would use patient ID)
+  const patient = patientDataStore.getPatients().find(p => p.name === appointment.patient) || {
     id: 1,
     name: appointment.patient,
     age: 45,
-    gender: 'Male',
     email: 'john.doe@email.com',
-    phone: '+1 234-567-8900',
-    bloodType: 'O+',
-    allergies: ['Penicillin', 'Peanuts'],
-    currentMedications: ['Lisinopril 10mg', 'Metformin 500mg'],
-    address: '123 Main St, New York, NY 10001',
-    emergencyContact: 'Jane Doe - +1 234-567-8901'
+    phone: '+1 234-567-8900'
+  }
+  
+  // Get medical data from store
+  const medicalData = patientDataStore.getMedicalData(patient.id)
+  
+  // Declare all state variables first
+  const [isEditingMedical, setIsEditingMedical] = useState(false)
+  const [editedMedicalData, setEditedMedicalData] = useState({
+    bloodType: medicalData.bloodType,
+    allergies: [...medicalData.allergies],
+    chronicConditions: [...medicalData.chronicConditions],
+    currentMedications: medicalData.currentMedications.map(m => ({ ...m }))
   })
+  
+  const [patientDetails, setPatientDetails] = useState({
+    ...patient,
+    ...medicalData,
+    address: '123 Main St, New York, NY 10001',
+    emergencyContact: medicalData.emergencyContact ? 
+      `${medicalData.emergencyContact.name} - ${medicalData.emergencyContact.phone}` : 
+      'Jane Doe - +1 234-567-8901'
+  })
+  
+  // Subscribe to store changes
+  useEffect(() => {
+    const updateFromStore = () => {
+      const updatedMedicalData = patientDataStore.getMedicalData(patient.id)
+      setPatientDetails(prev => ({
+        ...patient,
+        ...updatedMedicalData,
+        address: prev.address || '123 Main St, New York, NY 10001',
+        emergencyContact: updatedMedicalData.emergencyContact ? 
+          `${updatedMedicalData.emergencyContact.name} - ${updatedMedicalData.emergencyContact.phone}` : 
+          prev.emergencyContact
+      }))
+      if (!isEditingMedical) {
+        setEditedMedicalData({
+          bloodType: updatedMedicalData.bloodType,
+          allergies: [...updatedMedicalData.allergies],
+          chronicConditions: [...updatedMedicalData.chronicConditions],
+          currentMedications: updatedMedicalData.currentMedications.map(m => ({ ...m }))
+        })
+      }
+    }
+    
+    // Initial load
+    updateFromStore()
+    
+    // Subscribe to store changes
+    const unsubscribe = patientDataStore.subscribe(updateFromStore)
+    return unsubscribe
+  }, [patient.id, isEditingMedical])
 
   const [previousAppointments] = useState([
     { id: 1, date: '2024-01-10', type: 'Check-up', diagnosis: 'Hypertension under control', doctor: 'Dr. Smith' },
@@ -68,6 +114,86 @@ function AppointmentDetailModal({ appointment, onClose, onUpdate }) {
     }
     onUpdate(updatedAppointment)
     alert('Progress saved successfully!')
+  }
+
+  const handleSaveMedical = () => {
+    const updatedMedicalData = {
+      bloodType: editedMedicalData.bloodType,
+      allergies: editedMedicalData.allergies,
+      chronicConditions: editedMedicalData.chronicConditions,
+      currentMedications: editedMedicalData.currentMedications
+    }
+    
+    // Update in store (single source of truth)
+    patientDataStore.updateMedicalData(patient.id, updatedMedicalData)
+    
+    // Update local state
+    const updatedPatientDetails = {
+      ...patientDetails,
+      ...updatedMedicalData
+    }
+    setPatientDetails(updatedPatientDetails)
+    
+    // TODO: Update in database - await updatePatientMedicalInfo(patient.id, updatedMedicalData)
+    if (onUpdatePatient) {
+      onUpdatePatient(updatedPatientDetails)
+    }
+    setIsEditingMedical(false)
+    alert('Medical information updated successfully!')
+  }
+
+  const handleAddMedication = () => {
+    setEditedMedicalData({
+      ...editedMedicalData,
+      currentMedications: [...editedMedicalData.currentMedications, { name: '', dosage: '', frequency: '' }]
+    })
+  }
+
+  const handleRemoveMedication = (index) => {
+    setEditedMedicalData({
+      ...editedMedicalData,
+      currentMedications: editedMedicalData.currentMedications.filter((_, i) => i !== index)
+    })
+  }
+
+  const handleUpdateMedication = (index, field, value) => {
+    const updated = [...editedMedicalData.currentMedications]
+    updated[index] = { ...updated[index], [field]: value }
+    setEditedMedicalData({ ...editedMedicalData, currentMedications: updated })
+  }
+
+  const handleAddAllergy = () => {
+    const newAllergy = prompt('Enter allergy name:')
+    if (newAllergy && newAllergy.trim()) {
+      setEditedMedicalData({
+        ...editedMedicalData,
+        allergies: [...editedMedicalData.allergies, newAllergy.trim()]
+      })
+    }
+  }
+
+  const handleRemoveAllergy = (index) => {
+    setEditedMedicalData({
+      ...editedMedicalData,
+      allergies: editedMedicalData.allergies.filter((_, i) => i !== index)
+    })
+  }
+
+  const handleAddCondition = () => {
+    const newCondition = prompt('Enter chronic condition:')
+    if (newCondition && newCondition.trim()) {
+      setEditedMedicalData({
+        ...editedMedicalData,
+        chronicConditions: [...editedMedicalData.chronicConditions, newCondition.trim()]
+      })
+    }
+  }
+
+  const handleRemoveCondition = (index) => {
+    setEditedMedicalData({
+      ...editedMedicalData,
+      chronicConditions: editedMedicalData.chronicConditions.filter((_, i) => i !== index)
+    })
   }
 
   const handleDownloadReport = (report) => {
@@ -236,32 +362,174 @@ function AppointmentDetailModal({ appointment, onClose, onUpdate }) {
               </div>
 
               <div className="space-y-4">
-                <h4 className="text-lg font-bold text-gray-800">Medical Information</h4>
+                <div className="flex justify-between items-center">
+                  <h4 className="text-lg font-bold text-gray-800">Medical Information</h4>
+                  {!isEditingMedical ? (
+                    <button
+                      onClick={() => setIsEditingMedical(true)}
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Edit
+                    </button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setIsEditingMedical(false)
+                          setEditedMedicalData({
+                            bloodType: patientDetails.bloodType,
+                            allergies: [...patientDetails.allergies],
+                            chronicConditions: [...patientDetails.chronicConditions],
+                            currentMedications: patientDetails.currentMedications.map(m => ({ ...m }))
+                          })
+                        }}
+                        className="px-3 py-1 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveMedical}
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs font-medium text-gray-600">Blood Type</label>
-                    <p className="text-sm text-gray-800">{patientDetails.bloodType}</p>
+                    {isEditingMedical ? (
+                      <select
+                        value={editedMedicalData.bloodType}
+                        onChange={(e) => setEditedMedicalData({...editedMedicalData, bloodType: e.target.value})}
+                        className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                      </select>
+                    ) : (
+                      <p className="text-sm text-gray-800">{patientDetails.bloodType}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600">Allergies</label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-medium text-gray-600">Allergies</label>
+                      {isEditingMedical && (
+                        <button
+                          onClick={handleAddAllergy}
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          + Add
+                        </button>
+                      )}
+                    </div>
                     <div className="flex flex-wrap gap-2 mt-1">
-                      {patientDetails.allergies.map((allergy, index) => (
-                        <span key={index} className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                      {(isEditingMedical ? editedMedicalData.allergies : patientDetails.allergies).map((allergy, index) => (
+                        <span key={index} className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium flex items-center gap-1">
                           {allergy}
+                          {isEditingMedical && (
+                            <button
+                              onClick={() => handleRemoveAllergy(index)}
+                              className="text-red-600 hover:text-red-800 font-bold"
+                            >
+                              ×
+                            </button>
+                          )}
                         </span>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600">Current Medications</label>
-                    <ul className="mt-1 space-y-1">
-                      {patientDetails.currentMedications.map((med, index) => (
-                        <li key={index} className="text-sm text-gray-800 flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 bg-teal-500 rounded-full"></span>
-                          {med}
-                        </li>
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-medium text-gray-600">Chronic Conditions</label>
+                      {isEditingMedical && (
+                        <button
+                          onClick={handleAddCondition}
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          + Add
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {(isEditingMedical ? editedMedicalData.chronicConditions : patientDetails.chronicConditions).map((condition, index) => (
+                        <span key={index} className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium flex items-center gap-1">
+                          {condition}
+                          {isEditingMedical && (
+                            <button
+                              onClick={() => handleRemoveCondition(index)}
+                              className="text-orange-600 hover:text-orange-800 font-bold"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
                       ))}
-                    </ul>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-medium text-gray-600">Current Medications</label>
+                      {isEditingMedical && (
+                        <button
+                          onClick={handleAddMedication}
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          + Add
+                        </button>
+                      )}
+                    </div>
+                    {isEditingMedical ? (
+                      <div className="mt-1 space-y-2">
+                        {editedMedicalData.currentMedications.map((med, index) => (
+                          <div key={index} className="p-2 bg-blue-50 rounded border border-blue-200 space-y-1">
+                            <input
+                              type="text"
+                              value={med.name}
+                              onChange={(e) => handleUpdateMedication(index, 'name', e.target.value)}
+                              placeholder="Medication name"
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <input
+                              type="text"
+                              value={med.dosage}
+                              onChange={(e) => handleUpdateMedication(index, 'dosage', e.target.value)}
+                              placeholder="Dosage"
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <input
+                              type="text"
+                              value={med.frequency}
+                              onChange={(e) => handleUpdateMedication(index, 'frequency', e.target.value)}
+                              placeholder="Frequency"
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <button
+                              onClick={() => handleRemoveMedication(index)}
+                              className="w-full px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <ul className="mt-1 space-y-1">
+                        {patientDetails.currentMedications.map((med, index) => (
+                          <li key={index} className="text-sm text-gray-800 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-teal-500 rounded-full"></span>
+                            {typeof med === 'string' ? med : `${med.name} (${med.dosage}, ${med.frequency})`}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
               </div>

@@ -10,37 +10,52 @@ function LoginForm({setIsLoggedIn}) {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showWelcome, setShowWelcome] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const medikaTitleRef = useRef(null)
 
   useEffect(() => {
-    // Animate welcome message in
-    if (welcomeRef.current && showWelcome) {
-      gsap.fromTo(welcomeRef.current,
-        { opacity: 0, scale: 0.8, color: '#ffffff' },
-        { 
-          opacity: 1, 
-          scale: 1, 
-          color: '#2563eb',
-          duration: 1, 
-          ease: "power2.out",
-          delay: 0.5,
+    if (!showWelcome) return
+
+    // Medika is already visible (no animation), wait a bit then fade it out
+    setTimeout(() => {
+      if (medikaTitleRef.current) {
+        gsap.to(medikaTitleRef.current, {
+          opacity: 0,
+          duration: 0.5,
+          ease: "power2.in",
           onComplete: () => {
-            // After 1 second, fade out welcome and show form
-            setTimeout(() => {
-              gsap.to(welcomeRef.current, {
-                opacity: 0,
-                scale: 0.8,
-                duration: 0.5,
-                ease: "power2.in",
-                onComplete: () => {
-                  setShowWelcome(false)
-                  setShowForm(true)
+            // After Medika disappears, show welcome message
+            if (welcomeRef.current) {
+              gsap.fromTo(welcomeRef.current,
+                { opacity: 0, scale: 0.8, color: '#ffffff' },
+                { 
+                  opacity: 1, 
+                  scale: 1, 
+                  color: '#2563eb',
+                  duration: 0.5, 
+                  ease: "power2.out",
+                  delay: 0.2,
+                  onComplete: () => {
+                    // After 1 second, fade out welcome and show form
+                    setTimeout(() => {
+                      gsap.to(welcomeRef.current, {
+                        opacity: 0,
+                        scale: 0.8,
+                        duration: 0.5,
+                        ease: "power2.in",
+                        onComplete: () => {
+                          setShowWelcome(false)
+                          setShowForm(true)
+                        }
+                      })
+                    }, 300)
+                  }
                 }
-              })
-            }, 1000)
+              )
+            }
           }
-        }
-      )
-    }
+        })
+      }
+    }, 500) // Show Medika for 1.5 seconds before fading out
   }, [showWelcome])
 
   useEffect(() => {
@@ -112,16 +127,43 @@ function LoginForm({setIsLoggedIn}) {
   }
 
   return (
-    <div className="flex items-center justify-center h-full w-full p-8">
+    <div className="flex items-center justify-center h-full w-full p-8 relative">
       {showWelcome && (
-        <div 
-          ref={welcomeRef}
-          className="text-center"
-        >
-          <h1 className="text-6xl font-bold text-white">
-            Welcome to Medika
-          </h1>
-        </div>
+        <>
+          {/* Medika Title - Left side */}
+          <div 
+            ref={medikaTitleRef}
+            className="absolute left-12 top-1/2 transform -translate-y-1/2"
+          >
+            <h1 
+              className="text-7xl"
+              style={{
+                marginLeft: '100px',
+                fontFamily: "'Poppins', 'Inter', 'Montserrat', sans-serif",
+                fontWeight: 900,
+                WebkitTextStroke: '1px #ef4444',
+                textStroke: '4px #ef4444',
+                color: '#ffffff',
+                textShadow: '4px 4px 8px rgba(0, 0, 0, 0.5)',
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Medika
+            </h1>
+          </div>
+          
+          {/* Welcome Message - Center */}
+          <div 
+            ref={welcomeRef}
+            className="text-center"
+            style={{ opacity: 0, transform: 'scale(0.8)' }}
+          >
+            <h2 className="text-6xl font-bold text-white drop-shadow-lg">
+              Welcome
+            </h2>
+          </div>
+        </>
       )}
       
       {showForm && (

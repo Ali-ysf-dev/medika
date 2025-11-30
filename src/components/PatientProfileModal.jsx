@@ -1,33 +1,36 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import patientDataStore from '../store/patientDataStore'
 import '../App.css'
 
 function PatientProfileModal({ patient, onClose, onUpdate }) {
-  // TODO: Fetch from database based on patient.id
-  const [patientDetails] = useState({
+  // Get medical data from store
+  const medicalData = patientDataStore.getMedicalData(patient.id)
+  
+  const [patientDetails, setPatientDetails] = useState({
     ...patient,
-    gender: 'Male',
-    dateOfBirth: '1978-05-15',
-    bloodType: 'O+',
-    height: '175 cm',
-    weight: '80 kg',
-    allergies: ['Penicillin', 'Peanuts', 'Latex'],
-    chronicConditions: ['Hypertension', 'Type 2 Diabetes'],
-    currentMedications: [
-      { name: 'Lisinopril', dosage: '10mg', frequency: 'Once daily' },
-      { name: 'Metformin', dosage: '500mg', frequency: 'Twice daily' },
-      { name: 'Aspirin', dosage: '81mg', frequency: 'Once daily' }
-    ],
-    emergencyContact: {
-      name: 'Jane Doe',
-      relationship: 'Spouse',
-      phone: '+1 234-567-8901'
-    },
-    insurance: {
-      provider: 'HealthCare Plus',
-      policyNumber: 'HC-123456789',
-      validUntil: '2024-12-31'
-    }
+    ...medicalData
   })
+  
+  // Subscribe to store changes
+  useEffect(() => {
+    const updateFromStore = () => {
+      const updatedMedicalData = patientDataStore.getMedicalData(patient.id)
+      setPatientDetails(prev => ({
+        ...patient,
+        ...updatedMedicalData,
+        emergencyContact: prev.emergencyContact || updatedMedicalData.emergencyContact,
+        insurance: prev.insurance || updatedMedicalData.insurance
+      }))
+      setVitalSigns([...updatedMedicalData.vitalSigns])
+    }
+    
+    // Initial load
+    updateFromStore()
+    
+    // Subscribe to store changes
+    const unsubscribe = patientDataStore.subscribe(updateFromStore)
+    return unsubscribe
+  }, [patient.id])
 
   const [appointmentHistory] = useState([
     { 
@@ -133,22 +136,139 @@ function PatientProfileModal({ patient, onClose, onUpdate }) {
     },
   ])
 
-  const [vitalSigns] = useState([
-    { date: '2024-01-10', bp: '130/85', hr: '72', temp: '98.6°F', weight: '80 kg' },
-    { date: '2023-12-15', bp: '135/88', hr: '75', temp: '98.4°F', weight: '82 kg' },
-    { date: '2023-11-20', bp: '128/82', hr: '70', temp: '98.6°F', weight: '83 kg' },
-    { date: '2023-10-05', bp: '140/90', hr: '78', temp: '98.5°F', weight: '84 kg' },
-  ])
+  const [vitalSigns, setVitalSigns] = useState([...medicalData.vitalSigns])
 
   const [activeTab, setActiveTab] = useState('overview')
   const [isEditing, setIsEditing] = useState(false)
+  const [isEditingMedical, setIsEditingMedical] = useState(false)
   const [editedData, setEditedData] = useState(patientDetails)
+  const [editedMedicalData, setEditedMedicalData] = useState({
+    bloodType: medicalData.bloodType,
+    height: medicalData.height,
+    weight: medicalData.weight,
+    allergies: [...medicalData.allergies],
+    chronicConditions: [...medicalData.chronicConditions],
+    currentMedications: medicalData.currentMedications.map(m => ({ ...m }))
+  })
+  const [editedVitalSigns, setEditedVitalSigns] = useState([...medicalData.vitalSigns])
 
   const handleSave = () => {
     // TODO: Update in database - await updatePatient(patient.id, editedData)
-    onUpdate({ ...patient, ...editedData })
+    const updatedPatient = { ...patient, ...editedData }
+    onUpdate(updatedPatient)
     setIsEditing(false)
     alert('Patient information updated successfully!')
+  }
+
+  const handleSaveMedical = () => {
+    const updatedMedicalData = {
+      bloodType: editedMedicalData.bloodType,
+      height: editedMedicalData.height,
+      weight: editedMedicalData.weight,
+      allergies: editedMedicalData.allergies,
+      chronicConditions: editedMedicalData.chronicConditions,
+      currentMedications: editedMedicalData.currentMedications
+    }
+    
+    // Update in store (single source of truth)
+    patientDataStore.updateMedicalData(patient.id, updatedMedicalData)
+    
+    // Update local state
+    const updatedPatientDetails = {
+      ...patientDetails,
+      ...updatedMedicalData
+    }
+    setPatientDetails(updatedPatientDetails)
+    setEditedData(updatedPatientDetails)
+    
+    // TODO: Update in database - await updatePatientMedicalInfo(patient.id, updatedMedicalData)
+    onUpdate({ ...patient, ...updatedPatientDetails })
+    setIsEditingMedical(false)
+    alert('Medical information updated successfully!')
+  }
+
+  const handleAddMedication = () => {
+    setEditedMedicalData({
+      ...editedMedicalData,
+      currentMedications: [...editedMedicalData.currentMedications, { name: '', dosage: '', frequency: '' }]
+    })
+  }
+
+  const handleRemoveMedication = (index) => {
+    setEditedMedicalData({
+      ...editedMedicalData,
+      currentMedications: editedMedicalData.currentMedications.filter((_, i) => i !== index)
+    })
+  }
+
+  const handleUpdateMedication = (index, field, value) => {
+    const updated = [...editedMedicalData.currentMedications]
+    updated[index] = { ...updated[index], [field]: value }
+    setEditedMedicalData({ ...editedMedicalData, currentMedications: updated })
+  }
+
+  const handleAddAllergy = () => {
+    const newAllergy = prompt('Enter allergy name:')
+    if (newAllergy && newAllergy.trim()) {
+      setEditedMedicalData({
+        ...editedMedicalData,
+        allergies: [...editedMedicalData.allergies, newAllergy.trim()]
+      })
+    }
+  }
+
+  const handleRemoveAllergy = (index) => {
+    setEditedMedicalData({
+      ...editedMedicalData,
+      allergies: editedMedicalData.allergies.filter((_, i) => i !== index)
+    })
+  }
+
+  const handleAddCondition = () => {
+    const newCondition = prompt('Enter chronic condition:')
+    if (newCondition && newCondition.trim()) {
+      setEditedMedicalData({
+        ...editedMedicalData,
+        chronicConditions: [...editedMedicalData.chronicConditions, newCondition.trim()]
+      })
+    }
+  }
+
+  const handleRemoveCondition = (index) => {
+    setEditedMedicalData({
+      ...editedMedicalData,
+      chronicConditions: editedMedicalData.chronicConditions.filter((_, i) => i !== index)
+    })
+  }
+
+  const handleAddVitalSign = () => {
+    const today = new Date().toISOString().split('T')[0]
+    setEditedVitalSigns([{ date: today, bp: '', hr: '', temp: '', weight: '' }, ...editedVitalSigns])
+  }
+
+  const handleUpdateVitalSign = (index, field, value) => {
+    const updated = [...editedVitalSigns]
+    updated[index] = { ...updated[index], [field]: value }
+    setEditedVitalSigns(updated)
+  }
+
+  const handleRemoveVitalSign = (index) => {
+    setEditedVitalSigns(editedVitalSigns.filter((_, i) => i !== index))
+  }
+
+  const handleSaveVitalSigns = () => {
+    // Update in store (single source of truth)
+    patientDataStore.updateMedicalData(patient.id, { vitalSigns: editedVitalSigns })
+    
+    // Update local state
+    setVitalSigns([...editedVitalSigns])
+    setPatientDetails({
+      ...patientDetails,
+      vitalSigns: editedVitalSigns
+    })
+    
+    // TODO: Update in database - await updatePatientVitalSigns(patient.id, editedVitalSigns)
+    alert('Vital signs updated successfully!')
   }
 
   const handleDownloadReport = (report) => {
@@ -363,7 +483,7 @@ function PatientProfileModal({ patient, onClose, onUpdate }) {
                         onClick={handleSave}
                         className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                       >
-                        Save Changes
+                        Save
                       </button>
                     </div>
                   )}
@@ -453,69 +573,227 @@ function PatientProfileModal({ patient, onClose, onUpdate }) {
 
           {/* Medical Info Tab */}
           {activeTab === 'medical' && (
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-6">
-                <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Physical Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-gray-600">Blood Type</label>
-                      <p className="text-2xl font-bold text-red-600 mt-1">{patientDetails.bloodType}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600">Height</label>
-                      <p className="text-xl font-semibold text-gray-800 mt-1">{patientDetails.height}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600">Weight</label>
-                      <p className="text-xl font-semibold text-gray-800 mt-1">{patientDetails.weight}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600">BMI</label>
-                      <p className="text-xl font-semibold text-gray-800 mt-1">26.1</p>
-                    </div>
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-bold text-gray-800">Medical Information</h3>
+                {!isEditingMedical ? (
+                  <button
+                    onClick={() => setIsEditingMedical(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Edit Medical Info
+                  </button>
+                ) : (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setIsEditingMedical(false)
+                        setEditedMedicalData({
+                          bloodType: patientDetails.bloodType,
+                          height: patientDetails.height,
+                          weight: patientDetails.weight,
+                          allergies: [...patientDetails.allergies],
+                          chronicConditions: [...patientDetails.chronicConditions],
+                          currentMedications: patientDetails.currentMedications.map(m => ({ ...m }))
+                        })
+                      }}
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveMedical}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Save
+                    </button>
                   </div>
-                </div>
-
-                <div className="bg-red-50 rounded-xl p-6 border border-red-200">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Allergies</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {patientDetails.allergies.map((allergy, index) => (
-                      <span key={index} className="px-4 py-2 bg-red-100 text-red-800 rounded-full text-sm font-medium border border-red-300">
-                        ⚠️ {allergy}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-orange-50 rounded-xl p-6 border border-orange-200">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Chronic Conditions</h3>
-                  <div className="space-y-2">
-                    {patientDetails.chronicConditions.map((condition, index) => (
-                      <div key={index} className="flex items-center gap-2 text-sm text-gray-800">
-                        <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
-                        {condition}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                )}
               </div>
 
-              <div>
-                <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Current Medications</h3>
-                  <div className="space-y-4">
-                    {patientDetails.currentMedications.map((med, index) => (
-                      <div key={index} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="font-semibold text-gray-800">{med.name}</div>
-                        <div className="text-sm text-gray-600 mt-1">
-                          <span className="font-medium">Dosage:</span> {med.dosage}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          <span className="font-medium">Frequency:</span> {med.frequency}
-                        </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-6">
+                  <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">Physical Information</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-medium text-gray-600">Blood Type</label>
+                        {isEditingMedical ? (
+                          <select
+                            value={editedMedicalData.bloodType}
+                            onChange={(e) => setEditedMedicalData({...editedMedicalData, bloodType: e.target.value})}
+                            className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                          </select>
+                        ) : (
+                          <p className="text-2xl font-bold text-red-600 mt-1">{patientDetails.bloodType}</p>
+                        )}
                       </div>
-                    ))}
+                      <div>
+                        <label className="text-xs font-medium text-gray-600">Height</label>
+                        {isEditingMedical ? (
+                          <input
+                            type="text"
+                            value={editedMedicalData.height}
+                            onChange={(e) => setEditedMedicalData({...editedMedicalData, height: e.target.value})}
+                            className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="e.g., 175 cm"
+                          />
+                        ) : (
+                          <p className="text-xl font-semibold text-gray-800 mt-1">{patientDetails.height}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-600">Weight</label>
+                        {isEditingMedical ? (
+                          <input
+                            type="text"
+                            value={editedMedicalData.weight}
+                            onChange={(e) => setEditedMedicalData({...editedMedicalData, weight: e.target.value})}
+                            className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="e.g., 80 kg"
+                          />
+                        ) : (
+                          <p className="text-xl font-semibold text-gray-800 mt-1">{patientDetails.weight}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-600">BMI</label>
+                        <p className="text-xl font-semibold text-gray-800 mt-1">26.1</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-red-50 rounded-xl p-6 border border-red-200">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-bold text-gray-800">Allergies</h3>
+                      {isEditingMedical && (
+                        <button
+                          onClick={handleAddAllergy}
+                          className="px-3 py-1 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                          + Add
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(isEditingMedical ? editedMedicalData.allergies : patientDetails.allergies).map((allergy, index) => (
+                        <span key={index} className="px-4 py-2 bg-red-100 text-red-800 rounded-full text-sm font-medium border border-red-300 flex items-center gap-2">
+                          ⚠️ {allergy}
+                          {isEditingMedical && (
+                            <button
+                              onClick={() => handleRemoveAllergy(index)}
+                              className="text-red-600 hover:text-red-800 font-bold"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-orange-50 rounded-xl p-6 border border-orange-200">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-bold text-gray-800">Chronic Conditions</h3>
+                      {isEditingMedical && (
+                        <button
+                          onClick={handleAddCondition}
+                          className="px-3 py-1 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                        >
+                          + Add
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {(isEditingMedical ? editedMedicalData.chronicConditions : patientDetails.chronicConditions).map((condition, index) => (
+                        <div key={index} className="flex items-center justify-between gap-2 text-sm text-gray-800">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                            {condition}
+                          </div>
+                          {isEditingMedical && (
+                            <button
+                              onClick={() => handleRemoveCondition(index)}
+                              className="text-red-600 hover:text-red-800 font-bold"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-bold text-gray-800">Current Medications</h3>
+                      {isEditingMedical && (
+                        <button
+                          onClick={handleAddMedication}
+                          className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          + Add
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-4">
+                      {(isEditingMedical ? editedMedicalData.currentMedications : patientDetails.currentMedications).map((med, index) => (
+                        <div key={index} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          {isEditingMedical ? (
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                value={med.name}
+                                onChange={(e) => handleUpdateMedication(index, 'name', e.target.value)}
+                                placeholder="Medication name"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              <input
+                                type="text"
+                                value={med.dosage}
+                                onChange={(e) => handleUpdateMedication(index, 'dosage', e.target.value)}
+                                placeholder="Dosage (e.g., 10mg)"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              <input
+                                type="text"
+                                value={med.frequency}
+                                onChange={(e) => handleUpdateMedication(index, 'frequency', e.target.value)}
+                                placeholder="Frequency (e.g., Once daily)"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              <button
+                                onClick={() => handleRemoveMedication(index)}
+                                className="w-full px-3 py-1 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="font-semibold text-gray-800">{med.name}</div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                <span className="font-medium">Dosage:</span> {med.dosage}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Frequency:</span> {med.frequency}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -628,9 +906,17 @@ function PatientProfileModal({ patient, onClose, onUpdate }) {
           {/* Vital Signs Tab */}
           {activeTab === 'vitals' && (
             <div>
-              <div className="mb-4">
-                <h3 className="text-xl font-bold text-gray-800">Vital Signs History</h3>
-                <p className="text-sm text-gray-600 mt-1">Track patient's vital signs over time</p>
+              <div className="mb-4 flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">Vital Signs History</h3>
+                  <p className="text-sm text-gray-600 mt-1">Track patient's vital signs over time</p>
+                </div>
+                <button
+                  onClick={handleAddVitalSign}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  + Add Vital Sign
+                </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -641,20 +927,78 @@ function PatientProfileModal({ patient, onClose, onUpdate }) {
                       <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Heart Rate</th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Temperature</th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Weight</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {vitalSigns.map((vital, index) => (
+                    {editedVitalSigns.map((vital, index) => (
                       <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-4 text-sm text-gray-700">{vital.date}</td>
-                        <td className="py-4 px-4 text-sm font-medium text-gray-800">{vital.bp}</td>
-                        <td className="py-4 px-4 text-sm text-gray-700">{vital.hr} bpm</td>
-                        <td className="py-4 px-4 text-sm text-gray-700">{vital.temp}</td>
-                        <td className="py-4 px-4 text-sm text-gray-700">{vital.weight}</td>
+                        <td className="py-4 px-4">
+                          <input
+                            type="date"
+                            value={vital.date}
+                            onChange={(e) => handleUpdateVitalSign(index, 'date', e.target.value)}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="py-4 px-4">
+                          <input
+                            type="text"
+                            value={vital.bp}
+                            onChange={(e) => handleUpdateVitalSign(index, 'bp', e.target.value)}
+                            placeholder="e.g., 120/80"
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="py-4 px-4">
+                          <input
+                            type="text"
+                            value={vital.hr}
+                            onChange={(e) => handleUpdateVitalSign(index, 'hr', e.target.value)}
+                            placeholder="e.g., 72"
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="py-4 px-4">
+                          <input
+                            type="text"
+                            value={vital.temp}
+                            onChange={(e) => handleUpdateVitalSign(index, 'temp', e.target.value)}
+                            placeholder="e.g., 98.6°F"
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="py-4 px-4">
+                          <input
+                            type="text"
+                            value={vital.weight}
+                            onChange={(e) => handleUpdateVitalSign(index, 'weight', e.target.value)}
+                            placeholder="e.g., 80 kg"
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="py-4 px-4">
+                          <button
+                            onClick={() => handleRemoveVitalSign(index)}
+                            className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                {editedVitalSigns.length > 0 && (
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={handleSaveVitalSigns}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Save Vital Signs
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

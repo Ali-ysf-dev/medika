@@ -49,15 +49,6 @@ function GridView({
     { date: '19.11.2019 15:45', patient: 'Jerry Spenser', type: 'Chat' },
     { date: '22.11.2019 12:30', patient: 'Mark Gylenhaal', type: 'Phone' },
   ],
-  flowChartData = [
-    { label: 'Chat', value: 80 },
-    { label: 'Phone', value: 130 },
-    { label: 'Video', value: 115 },
-  ],
-  flowChartGrowth = 25,
-  flowChartMonth = 'October',
-  balance = 2190,
-  totalAppointments = 173,
   disableAnimation = false,
   navigateToAppointments = null,
   navigateToPatients = null,
@@ -90,163 +81,38 @@ function GridView({
       case 'Video': return <VideoIcon />
       case 'Chat': return <ChatIcon />
       case 'Phone': return <PhoneIcon />
+      case 'In-Person': return (
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8 8C9.65685 8 11 6.65685 11 5C11 3.34315 9.65685 2 8 2C6.34315 2 5 3.34315 5 5C5 6.65685 6.34315 8 8 8Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+          <path d="M2 14C2 11.2386 4.23858 9 7 9H9C11.7614 9 14 11.2386 14 14" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+        </svg>
+      )
       default: return <VideoIcon />
     }
   }
 
-  // Get icon for flow chart
-  const getFlowChartIcon = (label) => {
-    switch(label) {
-      case 'Chat': return <ChatIcon />
-      case 'Phone': return <PhoneIcon />
-      case 'Video': return <VideoIcon />
-      default: return <ChatIcon />
-    }
+  // Get today's schedule appointments
+  const getTodaysSchedule = () => {
+    const today = new Date().toISOString().split('T')[0]
+    // Sample today's schedule - in real app, fetch from appointments
+    return [
+      { time: '09:00 AM', patient: 'John Doe', type: 'Video', status: 'Confirmed' },
+      { time: '11:30 AM', patient: 'Jane Smith', type: 'In-Person', status: 'Confirmed' },
+      { time: '02:00 PM', patient: 'Mike Johnson', type: 'Phone', status: 'Pending' },
+      { time: '04:30 PM', patient: 'Sarah Williams', type: 'Video', status: 'Confirmed' },
+    ]
   }
 
-  const maxFlowValue = 150
+  const todaysSchedule = getTodaysSchedule()
 
-  const renderFlowChart = () => {
-    const svgWidth = 400
-    const svgHeight = 200
-    const padding = 40
-    const chartWidth = svgWidth - padding * 2
-    const chartHeight = svgHeight - padding * 2
-    const barWidth = (chartWidth / flowChartData.length) * 0.6
-    const barSpacing = (chartWidth / flowChartData.length) * 0.4
-
-    // Y-axis labels
-    const yAxisSteps = 5
-    const yAxisLabels = []
-    for (let i = 0; i <= yAxisSteps; i++) {
-      yAxisLabels.push((maxFlowValue / yAxisSteps) * (yAxisSteps - i))
-    }
-
-    return (
-      <div className="w-full h-full flex flex-col">
-        <div className="mb-4">
-          <h3 className="text-lg font-bold text-gray-800 mb-1">Flow chart</h3>
-          <div className="flex items-center gap-2">
-            <p className="text-sm text-gray-600">Your appointments in {flowChartMonth}</p>
-            <span className="text-sm font-semibold text-green-600 flex items-center gap-1">
-              +{flowChartGrowth}%
-              <ArrowUpIcon />
-            </span>
-          </div>
-        </div>
-        <div className="flex-1 flex items-center justify-center min-h-0">
-          <svg 
-            width={svgWidth} 
-            height={svgHeight} 
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            className="w-full h-full"
-            preserveAspectRatio="xMidYMid meet"
-          >
-            {/* Y-axis line */}
-            <line
-              x1={padding}
-              y1={padding}
-              x2={padding}
-              y2={svgHeight - padding}
-              stroke="#e5e7eb"
-              strokeWidth="2"
-            />
-            
-            {/* X-axis line */}
-            <line
-              x1={padding}
-              y1={svgHeight - padding}
-              x2={svgWidth - padding}
-              y2={svgHeight - padding}
-              stroke="#e5e7eb"
-              strokeWidth="2"
-            />
-
-            {/* Y-axis grid lines and labels */}
-            {yAxisLabels.map((value, index) => {
-              const y = padding + (chartHeight / yAxisSteps) * index
-              return (
-                <g key={`y-axis-${index}`}>
-                  {/* Grid line */}
-                  <line
-                    x1={padding}
-                    y1={y}
-                    x2={svgWidth - padding}
-                    y2={y}
-                    stroke="#f3f4f6"
-                    strokeWidth="1"
-                    strokeDasharray="2,2"
-                  />
-                  {/* Y-axis label */}
-                  <text
-                    x={padding - 10}
-                    y={y + 4}
-                    textAnchor="end"
-                    fontSize="10"
-                    fill="#6b7280"
-                  >
-                    {value}
-                  </text>
-                </g>
-              )
-            })}
-
-            {/* Bars */}
-            {flowChartData.map((item, index) => {
-              const barHeight = (item.value / maxFlowValue) * chartHeight
-              const x = padding + (chartWidth / flowChartData.length) * index + barSpacing / 2
-              const y = svgHeight - padding - barHeight
-              
-              return (
-                <g key={`bar-${index}`}>
-                  {/* Bar */}
-                  <rect
-                    x={x}
-                    y={y}
-                    width={barWidth}
-                    height={barHeight}
-                    fill="#3b82f6"
-                    rx="4"
-                  />
-                  {/* Value label on bar */}
-                  <text
-                    x={x + barWidth / 2}
-                    y={y - 5}
-                    textAnchor="middle"
-                    fontSize="11"
-                    fill="#1e40af"
-                    fontWeight="600"
-                  >
-                    {item.value}
-                  </text>
-                  {/* X-axis label */}
-                  <g transform={`translate(${x + barWidth / 2}, ${svgHeight - padding + 20})`}>
-                    <foreignObject width="60" height="40" x="-30">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="text-gray-600">{getFlowChartIcon(item.label)}</div>
-                        <span className="text-xs text-gray-600">{item.label}</span>
-                      </div>
-                    </foreignObject>
-                  </g>
-                  {/* Phone indicator dot */}
-                  {item.label === 'Phone' && (
-                    <circle
-                      cx={x + barWidth / 2}
-                      cy={y - 2}
-                      r="4"
-                      fill="#3b82f6"
-                      stroke="white"
-                      strokeWidth="2"
-                    />
-                  )}
-                </g>
-              )
-            })}
-          </svg>
-        </div>
-      </div>
-    )
-  }
+  const CalendarIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <line x1="5" y1="1" x2="5" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="11" y1="1" x2="11" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="2" y1="7" x2="14" y2="7" stroke="currentColor" strokeWidth="1.5"/>
+    </svg>
+  )
 
 
   return (
@@ -314,9 +180,48 @@ function GridView({
           </div>
         </div>
 
-        {/* Bottom Left - Flow Chart */}
-        <div className="col-span-1 row-span-1 bg-white rounded-[15px] p-6 shadow-[0_10px_30px_rgba(120,130,150,0.12),0_4px_10px_rgba(120,130,150,0.1),inset_0_8px_16px_rgba(120,130,150,0.12),inset_0_4px_8px_rgba(120,130,150,0.1),inset_0_2px_4px_rgba(120,130,150,0.06)] overflow-hidden">
-          {renderFlowChart()}
+        {/* Bottom Left - Today's Schedule */}
+        <div className="col-span-1 row-span-1 bg-white rounded-[15px] p-6 shadow-[0_10px_30px_rgba(120,130,150,0.12),0_4px_10px_rgba(120,130,150,0.1),inset_0_8px_16px_rgba(120,130,150,0.12),inset_0_4px_8px_rgba(120,130,150,0.1),inset_0_2px_4px_rgba(120,130,150,0.06)] flex flex-col overflow-hidden">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-2">
+              <CalendarIcon />
+              <h3 className="text-lg font-bold text-gray-800">Today's Schedule</h3>
+            </div>
+            <button 
+              onClick={() => navigateToAppointments && navigateToAppointments()}
+              className="text-blue-500 text-xs hover:text-blue-700 flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              View all
+              <ArrowRightIcon />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto hide-scrollbar">
+            <div className="space-y-3">
+              {todaysSchedule.map((item, index) => (
+                <div 
+                  key={index}
+                  onClick={() => navigateToAppointments && navigateToAppointments()}
+                  className="p-3 bg-gray-50 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors border border-gray-100"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-800">{item.time}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        item.status === 'Confirmed' ? 'bg-green-100 text-green-800' : 
+                        item.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {item.status}
+                      </span>
+                    </div>
+                    <span className="text-gray-500">{getAppointmentIcon(item.type)}</span>
+                  </div>
+                  <p className="text-sm text-gray-700 font-medium">{item.patient}</p>
+                  <p className="text-xs text-gray-500 mt-1">{item.type}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Bottom Middle - Patients and Inbox Stacked */}
@@ -362,26 +267,6 @@ function GridView({
               <div className="text-4xl font-bold text-blue-600 mb-2">12</div>
               <p className="text-xs text-gray-600 text-center">New Messages</p>
               <p className="text-[10px] text-gray-500 text-center">Unread</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Right - Balance */}
-        <div className="col-span-1 row-span-1 bg-white rounded-[15px] p-6 shadow-[0_10px_30px_rgba(120,130,150,0.12),0_4px_10px_rgba(120,130,150,0.1),inset_0_8px_16px_rgba(120,130,150,0.12),inset_0_4px_8px_rgba(120,130,150,0.1),inset_0_2px_4px_rgba(120,130,150,0.06)] flex flex-col overflow-hidden">
-          <div className="flex justify-end mb-6">
-            <a href="#" className="text-blue-500 text-sm hover:text-blue-700 flex items-center gap-1">
-              More
-              <ArrowRightIcon />
-            </a>
-          </div>
-          <div className="flex-1 flex flex-col justify-center items-center">
-            <div className="mb-6 w-full text-center">
-              <p className="text-sm font-bold text-gray-600 mb-2">Balance</p>
-              <p className="text-4xl font-bold text-gray-800">{balance} $</p>
-            </div>
-            <div className="w-full text-center">
-              <p className="text-sm font-bold text-gray-600 mb-2">Appointments</p>
-              <p className="text-4xl font-bold text-gray-800">{totalAppointments}</p>
             </div>
           </div>
         </div>
