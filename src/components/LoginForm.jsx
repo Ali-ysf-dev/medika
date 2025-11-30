@@ -136,17 +136,9 @@ function LoginForm({setIsLoggedIn}) {
             className="absolute left-12 top-1/2 transform -translate-y-1/2"
           >
             <h1 
-              className="text-7xl"
+              className="text-7xl medika-title"
               style={{
                 marginLeft: '100px',
-                fontFamily: "'Poppins', 'Inter', 'Montserrat', sans-serif",
-                fontWeight: 900,
-                WebkitTextStroke: '1px #ef4444',
-                textStroke: '4px #ef4444',
-                color: '#ffffff',
-                textShadow: '4px 4px 8px rgba(0, 0, 0, 0.5)',
-                letterSpacing: '0.15em',
-                textTransform: 'uppercase',
               }}
             >
               Medika
