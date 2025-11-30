@@ -1,5 +1,6 @@
 @import "@fontsource/poppins";
 @import "tailwindcss";
+
 html, body, #root {
   margin: 0;
   padding: 0;
@@ -96,7 +97,8 @@ body {
   scroll-behavior: smooth;
 }
 
-/* Medika Title Styles */
+/* Medika Title Styles - High specificity to override Tailwind */
+h1.medika-title,
 .medika-title {
   font-family: 'Poppins', 'Inter', 'Montserrat', sans-serif !important;
   font-weight: 900 !important;
@@ -105,4 +107,6 @@ body {
   text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.5) !important;
   letter-spacing: 0.15em !important;
   text-transform: uppercase !important;
+  font-size: 4.5rem !important;
+  line-height: 1 !important;
 }
